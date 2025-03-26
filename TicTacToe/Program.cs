@@ -24,18 +24,35 @@ class Program
             {
                 Program.CrearJugadors(i, ref jugadors);
             }
-            foreach (var jug in jugadors)
+
+            string urlPartida = "http://localhost:8080/partida/";
+            Partida partida = new Partida();
+
+            for (int i = 0; i < 10000; i++)
             {
-                Console.WriteLine(jug.pais);
+                string partidaNum = string.Concat(urlPartida, i.ToString());
+                r = await client.GetAsync(
+                      partidaNum
+                );
+
+                partida = JsonSerializer.Deserialize<Partida>(await r.Content.ReadAsStringAsync());
+                Console.WriteLine(partidaNum);
+
             }
+            
+
         }
 
     }
     public static void CrearJugadors(string comentari, ref List<Jugador> jugadors)
     {
+        string patroNom = @"participant\s(?<nomComplet>[A-Za-z]*\s[A-Za-z-']*)";
         string patroPais = @"representa\w*\s\w*\s(?<pais>[\w-]*)";
-        Match match = Regex.Match(comentari, patroPais);
-        Jugador j = new Jugador("jeje",match.Groups["pais"].ToString());
+        string desqualificada = "desqualificada";
+        Match matchNom = Regex.Match(comentari, patroNom);
+        Match matchPais = Regex.Match(comentari, patroPais);
+        Match matchDesqualificada = Regex.Match(comentari, desqualificada);
+        Jugador j = new Jugador(matchNom.Groups["nom"].ToString(),matchPais.Groups["pais"].ToString(), matchDesqualificada.Success);
         jugadors.Add(j);
     }
 }
