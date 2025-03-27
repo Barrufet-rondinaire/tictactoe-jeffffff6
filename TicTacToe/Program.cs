@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace TicTacToe;
@@ -15,8 +16,7 @@ class Program
             Console.WriteLine(r.StatusCode);
             r.EnsureSuccessStatusCode();
 
-            var jsonString = await r.Content.ReadAsStringAsync();
-            var arrayStrings = JsonSerializer.Deserialize<string[]>(jsonString);
+            var arrayStrings = await r.Content.ReadFromJsonAsync<string[]>();
 
             List<Jugador> jugadors = new List<Jugador>();
 
@@ -25,24 +25,31 @@ class Program
                 Program.CrearJugadors(i, ref jugadors);
             }
 
-            string urlPartida = "http://localhost:8080/partida/";
+            string urlPartida = "http://localhost:8080/partida";
             Partida partida = new Partida();
 
-            for (int i = 0; i < 10000; i++)
+            for (int i = 1; i <= 10000; i++)
             {
-                string partidaNum = string.Concat(urlPartida, i.ToString());
-                r = await client.GetAsync(
-                      partidaNum
-                );
+                try
+                {
+                    r = await client.GetAsync($"{urlPartida}/{i}");
+                    string json = await r.Content.ReadAsStringAsync();
+                    Partida deserializedPartida = JsonSerializer.Deserialize<Partida>(json);
+                }
+                catch (HttpRequestException ex)
+                {
+                    Console.WriteLine($"Request error en {i}: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Unexpected error en {i}: {ex.Message}");
+                }
 
-                partida = JsonSerializer.Deserialize<Partida>(await r.Content.ReadAsStringAsync());
-                Console.WriteLine(partidaNum);
+                
+
 
             }
-            
-
         }
-
     }
     public static void CrearJugadors(string comentari, ref List<Jugador> jugadors)
     {
@@ -52,7 +59,7 @@ class Program
         Match matchNom = Regex.Match(comentari, patroNom);
         Match matchPais = Regex.Match(comentari, patroPais);
         Match matchDesqualificada = Regex.Match(comentari, desqualificada);
-        Jugador j = new Jugador(matchNom.Groups["nom"].ToString(),matchPais.Groups["pais"].ToString(), matchDesqualificada.Success);
+        Jugador j = new Jugador(matchNom.Groups["nom"].ToString(), matchPais.Groups["pais"].ToString(), matchDesqualificada.Success);
         jugadors.Add(j);
     }
 }
