@@ -13,12 +13,11 @@ class Program
             var r = await client.GetAsync(
                       "http://localhost:8080/jugadors"
             );
-            Console.WriteLine(r.StatusCode);
             r.EnsureSuccessStatusCode();
 
             var arrayStrings = await r.Content.ReadFromJsonAsync<string[]>();
 
-            List<Jugador> jugadors = new List<Jugador>();
+            Dictionary<string,Jugador> jugadors = new Dictionary<string,Jugador>();
 
             foreach (var i in arrayStrings ?? Array.Empty<string>())
             {
@@ -33,25 +32,28 @@ class Program
                 try
                 {
                     r = await client.GetAsync($"{urlPartida}/{i}");
-                    string json = await r.Content.ReadAsStringAsync();
-                    Partida deserializedPartida = JsonSerializer.Deserialize<Partida>(json);
+                    r.EnsureSuccessStatusCode();
+                    partida = JsonSerializer.Deserialize<Partida>(await r.Content.ReadAsStringAsync());
                 }
-                catch (HttpRequestException ex)
-                {
-                    Console.WriteLine($"Request error en {i}: {ex.Message}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Unexpected error en {i}: {ex.Message}");
+                catch (HttpRequestException ex){
+                    Console.WriteLine($"error de http request en {i}: {ex.Message}");
+                }catch (JsonException ex){
+                    Console.WriteLine($"error de deserialización en {i}: {ex.Message}");
+                }catch (Exception ex){
+                    Console.WriteLine($"error en {i}: {ex.Message}");
                 }
 
-                
-
-
+                if (partida != null && jugadors.ContainsKey(partida.Guanyador()) && !jugadors[partida.Guanyador()].desqualificat){
+                    jugadors[partida.Guanyador()].partidesGuanyades++;
+                };
+            }
+            foreach (var jugador in jugadors)
+            {
+                Console.WriteLine($"{jugador.Value.nomComplet} {jugador.Value.partidesGuanyades} - {jugador.Value.desqualificat}");
             }
         }
     }
-    public static void CrearJugadors(string comentari, ref List<Jugador> jugadors)
+    public static void CrearJugadors(string comentari, ref Dictionary<string,Jugador> jugadors)
     {
         string patroNom = @"participant\s(?<nomComplet>[A-Za-z]*\s[A-Za-z-']*)";
         string patroPais = @"representa\w*\s\w*\s(?<pais>[\w-]*)";
@@ -59,7 +61,14 @@ class Program
         Match matchNom = Regex.Match(comentari, patroNom);
         Match matchPais = Regex.Match(comentari, patroPais);
         Match matchDesqualificada = Regex.Match(comentari, desqualificada);
-        Jugador j = new Jugador(matchNom.Groups["nom"].ToString(), matchPais.Groups["pais"].ToString(), matchDesqualificada.Success);
-        jugadors.Add(j);
+        string nomComplet = matchNom.Groups["nomComplet"].Value;
+        string pais = matchPais.Groups["pais"].Value;
+        
+        if (!string.IsNullOrEmpty(nomComplet)){
+            Jugador j = new Jugador(nomComplet, pais, matchDesqualificada.Success);
+            if (!jugadors.ContainsKey(nomComplet)){
+                jugadors.Add(nomComplet, j);
+            }
+        }
     }
 }
